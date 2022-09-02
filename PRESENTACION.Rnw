@@ -1,0 +1,2100 @@
+\documentclass{beamer}        % TIPO DE DOCUMENTO
+\usepackage[utf8]{inputenc}   % PAQUETES NECESARIOS
+\usepackage[spanish]{babel}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{indentfirst}
+\usepackage{multicol}
+\usepackage{float}
+\usepackage{environ}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{color}
+\usepackage{colortbl}
+\usepackage{ragged2e}
+\usepackage{array}
+\usepackage{ifthen}
+\usepackage{hyperref}
+\usetheme{PaloAlto}
+\definecolor{rojo1}{RGB}{153,051,051}
+\definecolor{azul1}{RGB}{000,051,153}
+
+
+\title{\textbf{Cifras Coyunturales Región del Biobío}} % TÍTULO PRESENTACIÓN
+\subtitle{\textit{Instituto Nacional de Estadísticas \\ Dirección Regional del Biobío}} %SUBTITULO PRESENTACIÓN
+\date{\textbf{\scriptsize{Fecha de Actualización: \today }}} % ACTUALIZACIÓN AUTOMATICA DE LA FECHA
+\graphicspath{C:/Users/jugarces/OneDrive - Instituto Nacional de Estadisticas/2013/alumno en practica/Alumnos 2022/ppt automatizada/}  % CAMBIAR DIRECTORIO GRAFICOS
+\logo {\includegraphics[width=1.6cm] {logo.jpg}}  % LOGO 
+  
+
+\begin{document}
+
+
+\begin{frame}
+    \titlepage 
+      \begin{figure}[!hb]                             % IMAGEN CON DIRECCIÓN URL EN PORTADA
+    \href{https://regiones.ine.cl/biobio/inicio}
+     {\includegraphics[width=3cm]{info.png}}
+  \end{figure}
+  
+\end{frame}
+
+
+\logo{\includegraphics[width=1.6cm]{logo.jpg}}  % INCLUYO EL LOGO INE EN LAS PAGINAS SIGUIENTES
+
+% LIBRERIAS Y OPCIONES NECESARIAS PARA R
+
+<<LIBRERIAS, echo=FALSE, include=FALSE>>=
+
+### LIBRERIAS UTILIZADAS ###
+
+library(knitr)
+library(openxlsx)   # para leer todos los links xlsx
+library(dplyr)
+library(ggplot2)    # para graficar
+library(ggthemes)   # para graficar con temas
+library(scales)
+library(stringr)    # para eliminar espacios en blanco de la base de datos
+library(readxl)     # para leer el unico excel (xls)
+library(data.table) # para transponer filas por columnas
+
+
+### SENTENCIA PARA RECONOCER COMA ###
+
+options(big.mark= ".") # Sentencia para reconocer el punto
+options(OutDec = ",")  # Sentencia para reconocer coma
+options(digits = 1)    # Sentencia para asignar cantidad de digitos
+@
+
+
+% SECCIÓN 1: ESTADÍSTICAS ECONÓMICAS
+
+\section{Estadísticas Económicas}
+
+
+
+% ITEM 1: INDICE DE PRECIOS AL CONSUMIDOR
+
+
+\begin{frame}{\textbf{Índice de Precios al Consumidor}}
+
+
+<<IPC, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_IPC = read.xlsx("https://www.ine.cl/docs/default-source/%C3%ADndice-de-precios-al-consumidor/cuadros-estadisticos/base-2018/series-de-tiempo/ipc.xls.xlsx?sfvrsn=c73e33d4_20",
+                                 sheet=1,
+                                 startRow=4,       
+                                 colNames=TRUE)
+str(datos_originales_IPC)
+
+## b) FILTRAMOS POR IPC GENERAL
+
+filtro_1 <- datos_originales_IPC %>% filter(Glosa=="IPC General")
+str(filtro_1)
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_IPC_1<-filtro_1 %>% mutate(mes_char= ifelse(Mes==1, "Enero",    # Agrego una nueva variable mes_char para llamar en latex
+                                         ifelse(Mes==2, "Febrero",
+                                         ifelse(Mes==3,"Marzo", 
+                                         ifelse(Mes==4,"Abril", 
+                                         ifelse(Mes==5,"Mayo", 
+                                         ifelse(Mes==6,"Junio", 
+                                         ifelse(Mes==7,"Julio", 
+                                         ifelse(Mes==8,"Agosto", 
+                                         ifelse(Mes==9,"Septiembre",   
+                                         ifelse(Mes==10,"Octubre", 
+                                         ifelse(Mes==11,"Noviembre", "Diciembre"))))))))))))
+str(mod_IPC_1)
+
+mod_IPC_2 <- mod_IPC_1 %>% mutate(fecha =(paste(`Año`, `Mes`,"01",  sep="-" )))  # Agrego una nueva variable fecha en formato Date ,uniendo año y mes. 
+str(mod_IPC_2)
+
+## d) CREAMOS UN NUEVO DATA.FRAME CON TODAS LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_IPC_2$fecha)
+año <-as.numeric(mod_IPC_2$Año)
+mes_num <-as.numeric(mod_IPC_2$Mes)
+mes_char<-as.character(mod_IPC_2$mes_char)
+var_mensual <- as.numeric(mod_IPC_2$`Variación.Mensual.(.%.)`)
+var_acumulada <- as.numeric(mod_IPC_2$`Variación.Acumulada.(.%.)`)
+var_12meses <- as.numeric(mod_IPC_2$`Variación.12.Meses.(.%.)`)
+
+datos_filtrados_IPC <-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,var_mensual=var_mensual,var_acumulada=var_acumulada,var_12meses=var_12meses)
+
+
+## e) FILTRAMOS ULTIMAS 13 FILAS IPC GENERAL PARA EL GRAFICO DE EVOLUCION
+
+options(digits=1)
+options(big.mark= ".")
+datos_grafica_IPC <- tail(datos_filtrados_IPC, n=13)
+IPC_mesactual <- tail(datos_filtrados_IPC, n=1)  # PARA VER DATOS IPC MES ACTUAL
+
+
+## f) GRAFICAMOS
+
+grafico_1 <- ggplot(datos_grafica_IPC, aes(x=fecha,y=var_mensual))+
+  geom_bar(stat="identity", fill="royalblue4")+
+  scale_x_date(date_breaks = "1 month",date_labels = "%b-%y", expand = c(0,8))+ 
+  ylab('Variación Mensual %')+
+  xlab(NULL)+
+  theme_economist_white()+ theme(axis.text = element_text(size = 8), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 8), axis.title.y.left = element_text(vjust=4, size = 8, colour = "royalblue4"),axis.title.y.right = element_text(vjust=1, size = 8))
+
+
+## g) GUARDAMOS EL GRAFICO PARA UTILIZARLO EN EL CODIGO DE LATEX
+
+ggsave("grafico_1.png",width = 5, height = 3)
+
+@
+
+
+\scriptsize{\begin{itemize}
+
+\item Variación IPC, \Sexpr{datos_grafica_IPC$mes_char[13]} \Sexpr{datos_grafica_IPC$año[13]}: \Sexpr{datos_grafica_IPC$var_mensual[13]}\% % MES Y AÑO AUTOMATICOS
+\item Variación Acumulada: \Sexpr{datos_grafica_IPC$var_acumulada[13]}\%
+\item Variación 12 Meses: \Sexpr{datos_grafica_IPC$var_12meses[13]}\% 
+			}
+			
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{EVOLUCIÓN IPC
+\\\textcolor{azul1}{Variación Mensual (\Sexpr{datos_grafica_IPC$mes_char[1]} \Sexpr{datos_grafica_IPC$año[1]} - \Sexpr{datos_grafica_IPC$mes_char[13]} \Sexpr{datos_grafica_IPC$año[13]})}}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+\centering
+\includegraphics[width=8cm,height=4.5cm]{grafico_1.png}
+
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+
+% ITEM 2: GENERACIÓN DE ENERGÍA ELÉCTRICA
+
+
+\begin{frame}{\textbf{Generación de Energía Eléctrica}}
+
+
+<<GENERACIÓN ENERGÍA ELÉCTRICA, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_GEE = read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/generacion-y-distribucion-de-energia-electrica/cuadros-estadisticos/series-mensuales/generacion-de-energia-electrica-por-tipo.xlsx?sfvrsn=bc5529d2_32", 
+                                 sheet=1,          # Solo hay 1 hoja en el documento xlsx
+                                 startRow =8,      # En la fila 8 comienzan los datos
+                                 colNames=FALSE)   # No dejamos ninguna fila como nombre ya que se reperiria la variable "total".
+str(datos_originales_GEE)
+
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_2<- head(datos_originales_GEE, n=-10)
+str(filtro_2)
+
+
+## c) AGREGAMOS UNA VARIABLE MES ESCRITO COMO NÚMERO (PARA UNIRLA COM AÑO), UNA VARIABLE FECHA (PARA GRAFICAR) Y ELIMINAMOS LOS CARACTERES DE LA VARIABLE AÑO.
+
+mod_GEE_1<-filtro_2 %>% mutate(año_num = (substr(filtro_2$X1,1,4))) # Dejo la variable año numeric.
+str(mod_GEE_1)
+
+mod_GEE_2<-mod_GEE_1 %>% mutate(mes_num= ifelse(X2=="Enero", 1,   # Agrego una nueva variable mes en números para la variable date de la fecha.
+                                         ifelse(X2=="Febrero", 2,
+                                         ifelse(X2=="Marzo", 3,
+                                         ifelse(X2=="Abril", 4,
+                                         ifelse(X2=="Mayo", 5,
+                                         ifelse(X2=="Junio", 6,
+                                         ifelse(X2=="Julio", 7,
+                                         ifelse(X2=="Agosto", 8,
+                                         ifelse(X2=="Septiembre", 9,  
+                                         ifelse(X2=="Octubre", 10,
+                                         ifelse(X2=="Noviembre", 11, 12))))))))))))                  
+              
+str(mod_GEE_2)
+
+mod_GEE_3 <- mod_GEE_2 %>% mutate(fecha = paste(`año_num`, `mes_num`,"01",  sep="-" ))  # Agrego una variable fecha uniendo año y mes.
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS DOS NUEVAS VARIABLES
+
+
+mod_GEE_3$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_GEE_3)[1]) {
+  mod_GEE_3$var_mensual[i] <- (((mod_GEE_3$X4[i]/mod_GEE_3$X4[i-1])-1)*100)
+}
+
+
+mod_GEE_3$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_GEE_3)[1]) {
+  mod_GEE_3$var_12meses[i] <- (((mod_GEE_3$X4[i]/mod_GEE_3$X4[i-12])-1)*100)
+}
+
+mod_GEE_3$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_GEE_3)[1]) {
+  mod_GEE_3$var_acumulada [i]<-(sum(mod_GEE_3$Total[(i-j):(i)])/sum(mod_GEE_3$Total[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+str(mod_GEE_3)
+
+
+
+## e) CREAMOS UN NUEVO DATA.FRAME CON TODAS LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+# Data.Frame gráfico barras
+
+fecha <-as.Date(mod_GEE_3$fecha)
+año <-as.numeric(mod_GEE_3$año_num)
+mes_num <-as.numeric(mod_GEE_3$mes_num)
+mes_char<-as.character(mod_GEE_3$X2)
+gen_electrica<- as.numeric(mod_GEE_3$X4)
+var_mensual <- as.numeric(mod_GEE_3$var_mensual)
+var_12meses <- as.numeric(mod_GEE_3$var_12meses)
+
+datos_filtrados_GEE <-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,gen_electrica=gen_electrica,var_mensual=var_mensual,var_12meses=var_12meses)
+
+
+# Data.Frame gráfico circular
+
+hidraulica <-as.numeric(mod_GEE_3$X5)
+termica <-as.numeric(mod_GEE_3$X6)
+otras <-as.numeric(mod_GEE_3$X7)
+
+datos_filtrados_GEE_2 <-data.frame(hidraulica=hidraulica,termica=termica,otras=otras)
+
+## f) FILTRAMOS ULTIMAS 13 FILAS IPC GENERAL PARA EL GRAFICO DE EVOLUCION
+
+
+options(digits = 1)
+datos_grafica_GEE <- tail(datos_filtrados_GEE, n=30) # filtro para el gráfico de barras
+# tail(datos_filtrados_GEE, n=1)  # PARA VER DATOS GEE MES ACTUAL
+
+
+options(digits = 1)
+datos_grafica_GEE_2 <- tail(datos_filtrados_GEE_2, n=1) # filtro para el gráfico de circular
+
+## g) GRAFICAMOS
+
+# Gráfico de barras
+
+ylim.prim <- c(-20, 30)  # var_12meses
+ylim.sec <- c(970, 1720)   # gen_electrica
+
+b <- diff(ylim.prim)/diff(ylim.sec)
+a <- b*(ylim.prim[1] - ylim.sec[1])
+
+
+grafico_2a <- ggplot(datos_grafica_GEE, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(a + gen_electrica*b)), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(a + gen_electrica*b)), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación Interanual (%)",breaks = seq(-30, 30, 10),position = "right", sec.axis = sec_axis(~(. - a)/b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "GWh" ,breaks = seq(700, 1400, 100)))+
+  labs(title = "\U2588 Variación Interanual (%)" , subtitle= "-o- Generación de Energía Eléctrica")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_2a + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                   plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+ggsave("grafico_2a.png",width=9.5, height=6) # guardamos el grafico para utilizarlo en latex
+
+
+# Gráfico de circular
+
+categorias <- c("Hidráulica","Térmica","Otras Fuentes") 
+valores <- c(datos_grafica_GEE_2$hidraulica,datos_grafica_GEE_2$termica,datos_grafica_GEE_2$otras)
+
+df <- data.frame(valores, categorias)
+
+porcentaje<- df$valores/sum(df$valores)
+
+pcnt <- percent(porcentaje, accuracy=0.1 , decimal.mark = ",")
+
+df2 <- data.frame(valores, pcnt, categorias, porcentaje)
+
+
+grafico_2b <- ggplot(df2, aes(x = "", y = porcentaje, fill = categorias)) +
+  geom_col(color = "white") +
+  geom_label(aes(label = pcnt), color = "white", position = position_stack(vjust = 0.5), size=4, show.legend = FALSE)+
+  labs(x=NULL)+
+  guides(fill = guide_legend(title = "Fuente de Producción"),size = guide_legend(order=3)) +
+  scale_fill_manual(values = c("royalblue4","#CDAD00","firebrick4"))+
+  coord_polar(theta = "y") +
+  theme_void()
+grafico_2b + theme()
+
+ggsave("grafico_2b.png",width = 5, height = 3) # guardamos el grafico para utilizarlo en latex
+
+@
+
+
+\scriptsize{\begin{itemize}
+
+\item Generación de Energía Eléctrica, \Sexpr{datos_grafica_GEE$mes_char[30]} \Sexpr{datos_grafica_GEE$año[30]}: \Sexpr{datos_grafica_GEE$gen_electrica[30]}\ GWh  % MES Y AÑO  AUTOMATICO
+\item Variación Mensual: \Sexpr{datos_grafica_GEE$var_mensual[30]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_GEE$var_12meses[30]}\% }
+
+\end{itemize}	
+\vspace{1cm}
+
+
+\begin{columns}[c]
+
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{GENERACIÓN DE ENERGÍA ELÉCTRICA (GWh)\\
+\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_GEE$mes_char[1]} \Sexpr{datos_grafica_GEE$año[1]} - \Sexpr{datos_grafica_GEE$mes_char[30]} \Sexpr{datos_grafica_GEE$año[30]}) }}}}} % INTERVALO MES/AÑO  AUTOMATICO
+\centering
+\includegraphics[width=5.5cm,height=3.3cm\textwidth]{grafico_2a.png}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{PARTICIPACIÓN POR FUENTE (\%)\\
+\textcolor{azul1}{Región del Biobío - \Sexpr{datos_grafica_GEE$mes_char[30]} \Sexpr{datos_grafica_GEE$año[30]} }}}}}
+\centering
+\includegraphics[width=5.5cm,height=3.3cm\textwidth]{grafico_2b.png}
+\end{column}
+
+\end{columns}
+
+
+\end{frame}
+
+
+
+
+% ITEM 3: DISTRIBUCIÓN TOTAL DE ENERGÍA ELÉCTRICA
+
+\begin{frame}{\textbf{Distribución Total de Energía Eléctrica}}
+
+<<DISTRIBUCIÓN ENERGÍA ELÉCTRICA, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_DEE = read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/distribuci%C3%B3n-de-energ%C3%ADa-el%C3%A9ctrica/cuadros-estad%C3%ADsticos/series-mensuales/distribucion-de-energia-electrica.xlsx?sfvrsn=3b775cf8_30",
+                                 sheet=1,           
+                                 startRow =5,      
+                                 colNames=TRUE)    
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_4 <- head(datos_originales_DEE, n=-4)
+str(filtro_4)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_DEE_1 <- filtro_4 %>% mutate(año=substr(filtro_4$Año,1,4)) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_DEE_1)
+
+mod_DEE_2 <- mod_DEE_1 %>% mutate(mes_char= ifelse(Mes==1, "Enero", # Agrego una nueva variable mes_num para generar un as.date y graficar.
+                                            ifelse(Mes==2,"Febrero", 
+                                            ifelse(Mes==3,"Marzo", 
+                                            ifelse(Mes==4,"Abril", 
+                                            ifelse(Mes==5,"Mayo", 
+                                            ifelse(Mes==6,"Junio", 
+                                            ifelse(Mes==7,"Julio", 
+                                            ifelse(Mes==8,"Agosto", 
+                                            ifelse(Mes==9,"Septiembre",   
+                                            ifelse(Mes==10,"Octubre", 
+                                            ifelse(Mes==11,"Noviembre", "Diciembre"))))))))))))                  
+str(mod_DEE_2)
+
+mod_DEE_3 <- mod_DEE_2 %>% mutate(fecha =(paste(`año`, `Mes`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_DEE_3) 
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_DEE_3$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_DEE_3)[1]) {
+  mod_DEE_3$var_mensual[i] <- (((mod_DEE_3$Total[i]/mod_DEE_3$Total[i-1])-1)*100)
+}
+
+mod_DEE_3$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_DEE_3)[1]) {
+  mod_DEE_3$var_12meses[i] <- (((mod_DEE_3$Total[i]/mod_DEE_3$Total[i-12])-1)*100)
+}
+
+mod_DEE_3$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_DEE_3)[1]) {
+  mod_DEE_3$var_acumulada [i]<-(sum(mod_DEE_3$Total[(i-j):(i)])/sum(mod_DEE_3$Total[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_DEE_3$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_DEE_3$año)
+mes_num <-as.numeric(mod_DEE_3$Mes)
+mes_char<-as.character(mod_DEE_3$mes_char)
+dis_electrica <-as.numeric(mod_DEE_3$Total)
+var_mensual <-as.numeric(mod_DEE_3$var_mensual)
+var_12meses <-as.numeric(mod_DEE_3$var_12meses)
+var_acumulada <-as.numeric(mod_DEE_3$var_acumulada)
+
+datos_filtrados_DEE <-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,dis_electrica=dis_electrica,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+residencial <-as.numeric(mod_DEE_3$Residencial)
+comercial <-as.numeric(mod_DEE_3$Comercial)
+agricola <-as.numeric(mod_DEE_3$Agrícola)
+industral <-as.numeric(mod_DEE_3$Industrial)
+otros <-as.numeric(c(mod_DEE_3$Minera,mod_DEE_3$Varios))
+
+datos_filtrados_DEE_2 <-data.frame(residencial=residencial,comercial=comercial,agricola=agricola,industral=industral,otros=otros)
+
+## f) FILTRAMOS ULTIMAS 30 FILAS PARA EL GRAFICO DE EVOLUCION
+
+options(digits=1)
+datos_grafica_DEE <- tail(datos_filtrados_DEE, n=30)
+#tail(datos_filtrados_DEE, n=1)  # PARA VER DATOS DEE MES ACTUAL
+
+options(digits=1)
+datos_grafica_DEE_2 <- tail(datos_filtrados_DEE_2, n=1)
+
+## g) GRAFICAMOS
+
+
+a<-10
+b<-350
+
+grafico_3a <- ggplot(datos_grafica_DEE, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(dis_electrica-b)/a), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(dis_electrica-b)/a), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación 12 meses (%)",breaks = seq(-15, 35, 5),position = "right",sec.axis = sec_axis(~.*a+b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "GWh" ,breaks = seq(200, 700, 50) ))+
+  labs(title = "\U2588 Variación 12 meses (%)" , subtitle= " -o- Distribución de Energía Eléctrica")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=2, size = 15))
+
+grafico_3a + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                   plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust = -4)) +labs(x = NULL)
+
+
+ggsave("grafico_3a.png",width = 9.5, height = 6) # guardamos el grafico para utilizarlo en latex
+
+
+# Grafico Circular
+
+categorias <- c("Residencial","Comercial", "Agrícola","Industrial","Otros") 
+valores <- c(datos_grafica_DEE_2$residencial,datos_grafica_DEE_2$comercial,datos_grafica_DEE_2$agricola,datos_grafica_DEE_2$industral,datos_grafica_DEE_2$otros)
+
+df <- data.frame(valores, categorias)
+
+porcentaje<- df$valores/sum(df$valores)
+
+pcnt <- percent(porcentaje, accuracy=0.1 , decimal.mark = ",")
+
+df2 <- data.frame(valores, pcnt, categorias, porcentaje)
+
+
+grafico_3b <- ggplot(df2, aes(x = "", y = porcentaje, fill = categorias)) +
+  geom_col(color = "white") +
+  geom_label(aes(label = pcnt), color = "white" ,position = position_stack(vjust = c(0.7, 0.5,0.5,-0.8,0.2)),size=4, show.legend = FALSE) +
+  labs(x=NULL)+
+  guides(fill = guide_legend(title = "Fuente de Producción"),size = guide_legend(order=3)) +
+  scale_fill_manual(values = c("#9AC0CD","darkolivegreen3","royalblue4","#CDAD00","firebrick4"))+
+  coord_polar(theta = "y")+
+  theme_void() 
+grafico_3b + theme()
+
+ggsave("grafico_3b.png",width = 5, height = 3) # guardamos el grafico para utilizarlo en latex
+
+
+@
+
+
+\scriptsize{\begin{itemize}
+
+\item Distribución de Energía Eléctrica, \Sexpr{datos_grafica_DEE$mes_char[30]} \Sexpr{datos_grafica_DEE$año[30]}: \Sexpr{datos_grafica_DEE$dis_electrica[30]}\ GWh % MES Y AÑO AUTOMATICOS
+\item Variación Mensual : \Sexpr{datos_grafica_DEE$var_mensual[30]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_DEE$var_12meses[30]}\% 
+}
+
+\end{itemize}	
+\vspace{1cm}
+
+
+\begin{columns}[c]
+
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{DISTRIBUCIÓN DE ENERGÍA ELÉCTRICA (GWh)\\
+\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_DEE$mes_char[1]} \Sexpr{datos_grafica_DEE$año[1]} - \Sexpr{datos_grafica_DEE$mes_char[30]} \Sexpr{datos_grafica_DEE$año[30]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+\includegraphics[width=5.5cm,height=3.3cm\textwidth]{grafico_3a.png}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{PARTICIPACIÓN POR FUENTE(\%)\\
+\textcolor{azul1}{Región del Biobío - \Sexpr{datos_grafica_DEE$mes_char[30]} \Sexpr{datos_grafica_DEE$año[30]} }}}}}
+\includegraphics[width=5.5cm,height=3.3cm\textwidth]{grafico_3b.png}
+\end{column}
+
+\end{columns}
+
+
+\end{frame}
+
+
+
+
+% ITEM 4: ÍNDICE DE PRODUCCIÓN DE ELECTRICIDAD,GAS Y AGUA (EGA)
+
+\begin{frame}{\textbf{Índice de Producción de Electricidad, Gas y Agua (EGA)}}
+
+<<EGA, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL (usar read_excel para leer excel enviado por correo porque no está el link)
+
+setwd("C:/Users/jugarces/OneDrive - Instituto Nacional de Estadisticas/2013/alumno en practica/Alumnos 2022/ppt automatizada")
+
+datos_originales_EGA <- read_excel("revision Informe Índice de EGA abril2022.xls", sheet="EGA_2014")
+
+str(datos_originales_EGA)
+
+## b) TRASPONEMOS FILAS POR COLUMNAS
+
+filtro_3a <- head(datos_originales_EGA, n=c(105L,10L))
+filtro_3b<- tail(filtro_3a, n=-5)
+colnames(filtro_3b) <- c("NA","año","mes","indiceEGA","electricidad","gas","agua","var_mensual","var_12meses","var_acumulada")
+
+## c) AGREGAMOS UNA VARIABLE MES ESCRITO COMO NÚMERO (PARA UNIRLA COM AÑO), UNA VARIABLE FECHA (PARA GRAFICAR) Y ELIMINAMOS LOS CARACTERES DE LA VARIABLE AÑO.
+
+
+
+mod_EGA_1<-filtro_3b %>% mutate (año_num = c(2014,2014,2014,2014,2014,2014,2014,2014,2014,2014,2014,2014,
+                                             2015,2015,2015,2015,2015,2015,2015,2015,2015,2015,2015,2015,
+                                             2016,2016,2016,2016,2016,2016,2016,2016,2016,2016,2016,2016,
+                                             2017,2017,2017,2017,2017,2017,2017,2017,2017,2017,2017,2017,
+                                             2018,2018,2018,2018,2018,2018,2018,2018,2018,2018,2018,2018,
+                                             2019,2019,2019,2019,2019,2019,2019,2019,2019,2019,2019,2019,
+                                             2020,2020,2020,2020,2020,2020,2020,2020,2020,2020,2020,2020,
+                                             2021,2021,2021,2021,2021,2021,2021,2021,2021,2021,2021,2021,
+                                             2022,2022,2022,2022))
+
+
+mod_EGA_2<-mod_EGA_1 %>% mutate (mes_num = c(1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4,5,6,7,8,9,10,11,12,
+                                             1,2,3,4))
+
+
+mod_EGA_3 <- mod_EGA_2 %>% mutate(mes_char= ifelse(mes_num==1, "Enero", #Agrego una nueva variable mes_num para generar un as.date y graficar.
+                                            ifelse(mes_num==2,"Febrero", 
+                                            ifelse(mes_num==3,"Marzo", 
+                                            ifelse(mes_num==4,"Abril", 
+                                            ifelse(mes_num==5,"Mayo", 
+                                            ifelse(mes_num==6,"Junio", 
+                                            ifelse(mes_num==7,"Julio", 
+                                            ifelse(mes_num==8,"Agosto", 
+                                            ifelse(mes_num==9,"Septiembre",   
+                                            ifelse(mes_num==10,"Octubre", 
+                                            ifelse(mes_num==11,"Noviembre", "Diciembre"))))))))))))                  
+
+
+
+
+mod_EGA_4 <- mod_EGA_3 %>% mutate(fecha = paste(`año_num`, `mes_num`,"01",  sep="-" ))  # VARIABLE FECHA UNIENDO MES Y AÑO
+mod_EGA_4$fecha<-as.Date(mod_EGA_4$fecha) # AGREGO VARIABLE FECHA PARA GRAFICAR
+
+
+## d) CREAMOS UN NUEVO DATA.FRAME CON TODAS LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_EGA_4$fecha)
+año <-as.numeric(unlist(mod_EGA_4$año_num))
+mes_num <-as.numeric(mod_EGA_4$mes_num)
+mes_char<-unlist(mod_EGA_4$mes_char)
+indice_EGA <- as.numeric(mod_EGA_4$indiceEGA)
+electricidad<- as.numeric(mod_EGA_4$electricidad)
+gas<- as.numeric(mod_EGA_4$gas)
+agua<- as.numeric(mod_EGA_4$agua)
+var_mensual <-as.numeric(mod_EGA_4$var_mensual)
+var_12meses <-as.numeric(mod_EGA_4$var_12meses)
+var_acumulada <-as.numeric(mod_EGA_4$var_acumulada)
+
+datos_filtrados_EGA <-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,indice_EGA=indice_EGA,electricidad=electricidad,gas=gas,agua=agua,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## e) FILTRAMOS ULTIMAS 28 FILAS PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_EGA <- tail(datos_filtrados_EGA, n=28)
+#tail(datos_filtrados_EGA, n=1)  # PARA VER DATOS EGA MES ACTUAL
+
+
+## f) GRAFICAMOS
+
+ylim.prim <- c(-25,35)  # var_12mesEs
+ylim.sec <- c(20, 150)   # indice_EGA
+
+b <- diff(ylim.prim)/diff(ylim.sec)
+a <- b*(ylim.prim[1] - ylim.sec[1])
+
+
+grafico_4 <- ggplot(datos_grafica_EGA, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(a + indice_EGA*b)), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(a + indice_EGA*b)), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación 12 meses (%)",breaks = seq(-25, 35, 10),position = "right", sec.axis = sec_axis(~(. - a)/b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Valores de Indice" ,breaks = seq(0, 120,20)
+                                                                                                                       ))+
+  labs(title = "\U2588 Variación 12 meses (%)" , subtitle= "-o- Indice EGA")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_4 + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                   plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+ggsave("grafico_4.png",width=9.5, height=6) # guardamos el grafico para utilizarlo en latex
+
+ 
+
+ 
+
+@
+
+\scriptsize{\begin{itemize}
+
+\item Índice de Producción de Electricidad, Gas y Agua, \Sexpr{datos_grafica_EGA$mes_char[28]} \Sexpr{datos_grafica_EGA$año[28]}: \Sexpr{datos_grafica_EGA$indice_EGA[28]} \  % MES Y AÑO AUTOMATICO
+\item Variación Mensual: \Sexpr{datos_grafica_EGA$var_mensual[28]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_EGA$var_12meses[28]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{ÍNDICE DE ELECTRICIDAD, GAS Y AGUA (base promedio año 2014=100)
+\\\textcolor{azul1}{Variación Mensual (\Sexpr{datos_grafica_EGA$mes_char[1]} \Sexpr{datos_grafica_EGA$año[1]} - \Sexpr{datos_grafica_EGA$mes_char[28]} \Sexpr{datos_grafica_EGA$año[28]})}}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+\centering
+\includegraphics[width=8cm,height=4.5cm]{grafico_4.png}
+
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+
+% ITEM 5: PRODUCCIÓN DE CARNE BOVINA EN VARA
+
+\begin{frame}{\textbf{Producción de Carne Bovina en Vara}}
+
+<<PRODUCCIÓN CARNE BOVINA EN VARA, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_PCBV = read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/feria-y-mataderos/cuadros-estadistico/mataderos-de-ganado/produccion/produccion-de-carne-en-vara-por-especie-segun-periodo-2018-a-2022.xlsx?sfvrsn=ab54f391_31", 
+                                  sheet=1,          # solo hay 1 hoja en el documneto xlsx 
+                                  startRow =6,      # en la fila 6 comienzan los datos
+                                  colNames=TRUE)    # dejar la fila 5 como nombre de las columnas
+str(datos_originales_PCBV)
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA Y LOS ESPACIOS EN BLANCO
+
+filtro_5 <- head(datos_originales_PCBV, n=-4)  # Elimino los ultimos 4 datos de la tabla ya que no contienen datos.
+str(filtro_5)
+
+
+mes <- str_trim(filtro_5$X2) # Agrego una varible mes donde ELIMINO LOS ESAPCIOS EN BLANCO.
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_PCBV_1 <- mutate(filtro_5, mes_num=case_when(mes=="Enero"~1, #Agrego una nueva variable mes_char para llamar en latex.
+                                                 mes=="Febrero"~2, 
+                                                 mes=="Marzo"~3,
+                                                 mes=="Abril"~4,
+                                                 mes=="Mayo"~5,
+                                                 mes=="Junio"~6,
+                                                 mes=="Julio"~7,
+                                                 mes=="Agosto"~8,
+                                                 mes=="Septiembre"~9,
+                                                 mes=="Octubre"~10,
+                                                 mes=="Noviembre"~11, 
+                                                 mes=="Diciembre"~12))          
+
+str(mod_PCBV_1)
+
+mod_PCBV_2 <- mod_PCBV_1 %>% mutate(año=substr(mod_PCBV_1$X1,1,4)) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_PCBV_2)
+
+
+mod_PCBV_3 <- mod_PCBV_2 %>% mutate(fecha =(paste(`año`, `mes_num`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_PCBV_3) 
+
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_PCBV_3$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_PCBV_3)[1]) {
+  mod_PCBV_3$var_mensual[i] <- (((mod_PCBV_3$Bovinos[i]/mod_PCBV_3$Bovinos[i-1])-1)*100)
+}
+
+mod_PCBV_3$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_PCBV_3)[1]) {
+  mod_PCBV_3$var_12meses[i] <- (((mod_PCBV_3$Bovinos[i]/mod_PCBV_3$Bovinos[i-12])-1)*100)
+}
+
+mod_PCBV_3$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_PCBV_3)[1]) {
+  mod_PCBV_3$var_acumulada [i]<-(sum(mod_PCBV_3$Bovinos[(i-j):(i)])/sum(mod_PCBV_3$Bovinos[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_PCBV_3$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_PCBV_3$año)
+mes_num <-as.numeric(mod_PCBV_3$mes_num)
+mes_char<-as.character(mod_PCBV_3$X2)
+total_bovinos<-as.numeric(mod_PCBV_3$Bovinos)
+var_mensual <-as.numeric(mod_PCBV_3$var_mensual)
+var_12meses <-as.numeric(mod_PCBV_3$var_12meses)
+var_acumulada <-as.numeric(mod_PCBV_3$var_acumulada)
+
+datos_filtrados_PCBV <-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,total_bovinos=total_bovinos,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 29 FILAS IPC GENERAL PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_PCBV <- tail(datos_filtrados_PCBV, n=30)
+str(datos_grafica_PCBV)
+#tail(datos_filtrados_PCBV, n=1)  # PARA VER DATOS PCBV MES ACTUAL
+
+
+## g) GRAFICAMOS
+
+
+a<-13.8
+b<-800
+
+grafico_5 <- ggplot(datos_grafica_PCBV, aes(x=fecha))+
+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(total_bovinos-b)/a), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(total_bovinos-b)/a), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación 12 meses (%)",breaks = seq(-60, 80, 20),position = "right",sec.axis = sec_axis(~.*a+b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Toneladas" ,breaks = seq(0, 1800, 200) ))+
+  labs(title = "\U2588 Variación 12 meses (%)" , subtitle= "-o- Producción de Carne Bovina en Vara")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=2, size = 15))
+
+grafico_5 + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                  plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust = -4)) +labs(x = NULL)
+
+
+
+## h) GUARDAMOS EL GRAFICO PARA UTILIZARLO EN EL CODIGO DE LATEX
+
+ggsave("grafico_5.png",width = 9.5, height = 6)
+@
+
+\scriptsize{\begin{itemize}
+
+\item Producción de Carne Bovina en Vara, \Sexpr{datos_grafica_PCBV$mes_char[30]} \Sexpr{datos_grafica_PCBV$año[30]}: \Sexpr{datos_grafica_PCBV$total_bovinos[30]} Toneladas % MES Y AÑO AUTOMATICOS
+\item Variación Mensual: \Sexpr{datos_grafica_PCBV$var_mensual[30]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_PCBV$var_12meses[30]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{\\PRODUCCIÓN CARNE BOVINA EN VARA (Ton)
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_PCBV$mes_char[1]} \Sexpr{datos_grafica_PCBV$año[1]} - \Sexpr{datos_grafica_PCBV$mes_char[30]} \Sexpr{datos_grafica_PCBV$año[30]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+
+\centering
+
+\includegraphics[width=8cm,height=4.5cm]{grafico_5.png}
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+% ITEM 6: MOLIENDA DE TRIGO
+
+\begin{frame}{\textbf{Molienda de Trigo}}
+
+<<MOLIENDA DE TRIGO, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_MT= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/molienda-de-trigo/cuadros-estadisticos/series-mnsuales/molienda-de-trigo-blanco-y-candeal-por-productos-y-subproductos.xlsx?sfvrsn=2df96091_33", 
+                               sheet=1,          # Solo hay 1 hoja en el documento xlsx.
+                               startRow =9,      # en la fila 9 comienzan los datos
+                              colNames= FALSE)    # No dejamos ninguna fila como nombre ya que se repetiria la variable "total".
+
+str(datos_originales_MT)
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_6 <- head(datos_originales_MT, n=-2)
+str(filtro_6)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_MT_1 <- filtro_6 %>% mutate(mes_num= ifelse(X2=="Enero", 1, #Agrego una nueva variable mes_num para generar un as.date y graficar.
+                                         ifelse(X2=="Febrero", 2,
+                                         ifelse(X2=="Marzo", 3,
+                                         ifelse(X2=="Abril", 4,
+                                         ifelse(X2=="Mayo", 5,
+                                         ifelse(X2=="Junio", 6,
+                                         ifelse(X2=="Julio", 7,
+                                         ifelse(X2=="Agosto", 8,
+                                         ifelse(X2=="Septiembre", 9,  
+                                         ifelse(X2=="Octubre", 10,
+                                         ifelse(X2=="Noviembre", 11, 12))))))))))))                  
+str(mod_MT_1)
+
+mod_MT_2 <- mod_MT_1 %>% mutate(fecha =(paste(`X1`, `mes_num`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_MT_2) 
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_MT_2$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_MT_2)[1]) {
+  mod_MT_2$var_mensual[i] <- (((mod_MT_2$X5[i]/mod_MT_2$X5[i-1])-1)*100)
+}
+
+mod_MT_2$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_MT_2)[1]) {
+  mod_MT_2$var_12meses[i] <- (((mod_MT_2$X5[i]/mod_MT_2$X5[i-12])-1)*100)
+}
+
+mod_MT_2$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_MT_2)[1]) {
+  mod_MT_2$var_acumulada [i]<-(sum(mod_MT_2$X5[(i-j):(i)])/sum(mod_MT_2$X5[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_MT_2$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_MT_2$X1)
+mes_num <-as.numeric(mod_MT_2$mes_num)
+mes_char<-as.character(mod_MT_2$X2)
+total_trigo<-as.numeric(mod_MT_2$X5, options ("scipen"=1, "digits"=1, "big.mark"=".")) # SOLUCIONO EL MODO CIENTIFICO IMPRESO EN LATEX
+var_mensual <-as.numeric(mod_MT_2$var_mensual)
+var_12meses <-as.numeric(mod_MT_2$var_12meses)
+var_acumulada <-as.numeric(mod_MT_2$var_acumulada)
+
+datos_filtrados_MT<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,total_trigo=total_trigo,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 25 FILAS PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_MT <- tail(datos_filtrados_MT, n=25)
+str(datos_grafica_MT)
+#tail(datos_filtrados_MT, n=1)  # PARA VER DATOS MT MES ACTUAL
+
+
+## g) GRAFICAMOS 
+
+ylim.prim <- c(0, 16000)  # total_trigo
+ylim.sec <- c(-60, 50)   # var_12meses
+
+
+b <- diff(ylim.prim)/diff(ylim.sec)
+a <- b*(ylim.prim[1] - ylim.sec[1])
+
+
+grafico_6 <- ggplot(datos_grafica_MT, aes(x=fecha))+
+  geom_bar(aes(y=total_trigo), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(a + var_12meses*b)), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(a + var_12meses*b)), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous( name = "Toneladas" ,breaks = seq(0, 16000, 2000),position = "left",sec.axis = sec_axis(~(. - a)/b, labels=function(x) format(x, big.mark = ".", scientific = FALSE),name = "Variación 12 meses (%)",breaks = seq(-60, 50, 10) ))+
+  labs(title = "\U2588 Total Molienda de Trigo" , subtitle= "-o- Variación 12 meses (%)")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=2, size = 15))
+
+grafico_6 + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                  plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust = -4)) +labs(x = NULL)
+
+
+## h) GUARDAMOS EL GRAFICO PARA UTILIZARLO EN EL CODIGO DE LATEX
+
+ggsave("grafico_6.png",width = 9.5, height = 6)
+
+@
+
+\scriptsize{\begin{itemize}
+
+\item Molienda de Trigo, \Sexpr{datos_grafica_MT$mes_char[25]} \Sexpr{datos_grafica_MT$mes_año[25]}: \Sexpr{datos_grafica_MT$total_trigo[25]}\ Toneladas  % MES Y AÑO AUTOMATICOS
+\item Variación Mensual : \Sexpr{datos_grafica_MT$var_mensual[25]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_MT$var_12meses[25]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{\\MOLIENDA DE TRIGO
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_MT$mes_char[1]} \Sexpr{datos_grafica_MT$año[1]} - \Sexpr{datos_grafica_MT$mes_char[25]} \Sexpr{datos_grafica_MT$año[25]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+
+\centering
+
+\includegraphics[width=8cm,height=4.5cm]{grafico_6.png}
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+% ITEM 7: DESEMBARQUE PESQUERO
+
+\begin{frame}{\textbf{Desembarque Pesquero}}
+
+<<DESEMBARQUE PESQUERO, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+# PARA EL GRAFICO DE BARRAS
+
+datos_originales_DP= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/desembarque-pesquero/cuadros-estadisticos/series-mensuales/tabulados-desembarque-pesquero-biobio-2017-2022.xlsx?sfvrsn=ced84d3c_6",
+                               sheet=2,          # En la hoja 2 del documento xlsx estan los datos que necesitamos
+                               startRow =8,      # en la fila 8 comienzan los datos
+                               colNames= FALSE)    # No dejamos ninguna fila como nombre ya que se repetiria la variable "total".
+
+str(datos_originales_DP)
+
+filtro_7 <- head(datos_originales_DP, n=-6) #ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+str(filtro_7)
+
+#PARA EL GRAFICO CIRCULAR
+
+datos_desembarque_artesanal= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/desembarque-pesquero/cuadros-estadisticos/series-mensuales/tabulados-desembarque-pesquero-biobio-2017-2022.xlsx?sfvrsn=ced84d3c_6",
+                                       sheet=3,          # En la hoja 2 del documento xlsx estan los datos que necesitamos
+                                       startRow =8,      # en la fila 8 comienzan los datos
+                                       colNames= FALSE)    # No dejamos ninguna fila como nombre ya que se repetiria la variable "total".
+
+desembarque_artesanal<- head(datos_desembarque_artesanal, n=-4)
+
+
+datos_desembarque_industrial= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/desembarque-pesquero/cuadros-estadisticos/series-mensuales/tabulados-desembarque-pesquero-biobio-2017-2022.xlsx?sfvrsn=ced84d3c_6",
+                                        sheet=4,          # En la hoja 2 del documento xlsx estan los datos que necesitamos
+                                        startRow =8,      # en la fila 8 comienzan los datos
+                                        colNames= FALSE)    # No dejamos ninguna fila como nombre ya que se repetiria la variable "total".
+
+desembarque_industrial<- head(datos_desembarque_industrial, n=-4)
+
+
+datos_centros_cultivo= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/desembarque-pesquero/cuadros-estadisticos/series-mensuales/tabulados-desembarque-pesquero-biobio-2017-2022.xlsx?sfvrsn=ced84d3c_6",
+                                 sheet=5,          # En la hoja 2 del documento xlsx estan los datos que necesitamos
+                                 startRow =8,      # en la fila 8 comienzan los datos
+                                 colNames= FALSE)    # No dejamos ninguna fila como nombre ya que se repetiria la variable "total".
+
+centros_cultivo<- head(datos_centros_cultivo, n=-4)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_DP_1 <- filtro_7 %>% mutate(año=substr(filtro_7$X1,1,4)) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_DP_1)
+
+
+mod_DP_2 <- mod_DP_1 %>% mutate(mes_num= ifelse(X2=="Enero", 1, #Agrego una nueva variable mes_num para generar un as.date y graficar.
+                                                ifelse(X2=="Febrero", 2,
+                                                       ifelse(X2=="Marzo", 3,
+                                                              ifelse(X2=="Abril", 4,
+                                                                     ifelse(X2=="Mayo", 5,
+                                                                            ifelse(X2=="Junio", 6,
+                                                                                   ifelse(X2=="Julio", 7,
+                                                                                          ifelse(X2=="Agosto", 8,
+                                                                                                 ifelse(X2=="Septiembre", 9,  
+                                                                                                        ifelse(X2=="Octubre", 10,
+                                                                                                               ifelse(X2=="Noviembre", 11, 12))))))))))))                  
+str(mod_DP_2)
+
+mod_DP_3 <- mod_DP_2 %>% mutate(fecha =(paste(`año`, `mes_num`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_DP_3) 
+
+mod_DP_4 <- mod_DP_3 %>% mutate(total_desembarque=(as.numeric((mod_DP_3$X4/1000))))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_DP_4) 
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_DP_4$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_DP_4)[1]) {
+  mod_DP_4$var_mensual[i] <- (((mod_DP_4$total_desembarque[i]/mod_DP_4$total_desembarque[i-1])-1)*100)
+}
+
+mod_DP_4$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_DP_4)[1]) {
+  mod_DP_4$var_12meses[i] <- (((mod_DP_4$total_desembarque[i]/mod_DP_4$total_desembarque[i-12])-1)*100)
+}
+
+mod_DP_4$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_DP_4)[1]) {
+  mod_DP_4$var_acumulada [i]<-(sum(mod_DP_4$total_desembarque[(i-j):(i)])/sum(mod_DP_4$total_desembarque[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+
+# PARA EL GRAFICO DE BARRAS
+
+fecha <-as.Date(mod_DP_4$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_DP_4$año)
+mes_num <-as.numeric(mod_DP_4$mes_num)
+mes_char<-as.character(mod_DP_4$X2)
+total_desembarque<-as.numeric(mod_DP_4$total_desembarque)
+
+var_mensual <-as.numeric(mod_DP_4$var_mensual)
+var_12meses <-as.numeric(mod_DP_4$var_12meses)
+var_acumulada <-as.numeric(mod_DP_4$var_acumulada)
+
+datos_filtrados_DP<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,total_desembarque=total_desembarque,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+# PARA EL GRAFICO CIRCULAR
+
+total_desembarque_artesanal<-as.numeric(desembarque_artesanal$X4)
+total_desembarque_industrial <-as.numeric(desembarque_industrial$X4)
+total_centros_cultivo <-as.numeric(centros_cultivo$X4)
+
+datos_filtrados_DP_2<-data.frame(total_desembarque_artesanal=total_desembarque_artesanal,total_desembarque_industrial=total_desembarque_industrial,total_centros_cultivo=total_centros_cultivo )
+
+## f) FILTRAMOS LOS ULTIMOS 30 DATOS PARA GRAFICAR
+
+# GRAFICOS DE BARRAS
+
+datos_grafica_DP <- tail(datos_filtrados_DP, n=30)
+#tail(datos_filtrados_DP, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+# GRAFICO CIRCULAR
+datos_grafica_DP_2 <- tail(datos_filtrados_DP_2, n=1)
+
+
+## g) GRAFICAMOS solucionarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+
+
+a<-0.7
+b<-100  
+
+grafico_7a <- ggplot(datos_grafica_DP, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(total_desembarque-b)/a), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(total_desembarque-b)/a), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación 12 meses (%)",breaks = seq(-140, 310, 50),position = "right",sec.axis = sec_axis(~.*a+b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Miles de Toneladas" ,breaks = seq(50, 350, 50) ))+
+  labs(title = "\U2588 Variación 12 meses (%)" , subtitle= "-o- Desembarque Total")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_7a + theme(plot.subtitle = element_text(size = 16, colour =  "firebrick3", hjust = 0.95),
+                   plot.title = element_text(size = 16, colour ="royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+ggsave("grafico_7a.png",width = 9.5, height = 6) # guardamos el grafico para utilizarlo en latex
+
+
+
+
+
+# GRAFICO CIRCULAR
+
+categorias <- c("Industrial","Artesanal","Centros de Cultivo") 
+valores <- c(datos_grafica_DP_2$total_desembarque_industrial,datos_grafica_DP_2$total_desembarque_artesanal,datos_grafica_DP_2$total_centros_cultivo)
+
+df <- data.frame(valores, categorias)
+
+porcentaje<- df$valores/sum(df$valores)
+
+pcnt <- percent(porcentaje, accuracy=0.1 , decimal.mark = ",")
+
+df2 <- data.frame(valores, pcnt, categorias, porcentaje)
+
+
+grafico_7b <- ggplot(df2, aes(x = "", y = porcentaje, fill = categorias)) +
+  geom_col(color = "white") +
+  geom_label(aes(label = pcnt), color = "white", position = position_stack(vjust = 0.5), size=4, show.legend = FALSE)+
+  labs(x=NULL)+
+  guides(fill = guide_legend(title = "Fuente de Producción"),size = guide_legend(order=3)) +
+  scale_fill_manual(values = c("firebrick4","#CDAD00","royalblue4"))+
+  #  labs(title = "PARTICIPACIÓN (%) POR FUENTE DE PRODUCCIÓN",subtitle = "Región del Biobío - Junio 2022")+
+  coord_polar(theta = "y") +
+  theme_void()
+grafico_7b + theme()
+
+ggsave("grafico_7b.png",width = 5, height = 3) # guardamos el grafico para utilizarlo en latex
+
+
+@
+
+
+\scriptsize{\begin{itemize}
+
+\item Desembarque Pesquero, \Sexpr{datos_grafica_DP$mes_char[30]} \Sexpr{datos_grafica_DP$año[30]}: \Sexpr{datos_grafica_DP$total_desembarque[30]}\ Toneladas % MES Y AÑO AUTOMATICOS
+\item Variación Mensual: \Sexpr{datos_grafica_DP$var_mensual[30]}\%
+\item Variación 12 Meses: \Sexpr{datos_grafica_DP$var_12meses[30]}\% }
+
+\end{itemize}	
+\vspace{0.4cm}
+
+
+\begin{columns}[c]
+
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{DESEMBARQUE PESQUERO\\
+\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_DP$mes_char[1]} \Sexpr{datos_grafica_DP$año[1]} - \Sexpr{datos_grafica_DP$mes_char[30]} \Sexpr{datos_grafica_DP$año[30]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+\includegraphics[width=1\textwidth]{grafico_7a.png}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{PARTICIPACIÓN SUBSECTORES(\%)\\
+\textcolor{azul1}{Región del Biobío - \Sexpr{datos_grafica_DP$mes_char[30]} \Sexpr{datos_grafica_DP$año[30]} }}}}}
+\includegraphics[width=1\textwidth]{grafico_7b.png}    % INTERVALO MES/AÑO AUTOMATICOS
+\end{column}
+
+\end{columns}
+
+\end{frame}
+
+
+
+
+% ITEM 8: CARGA PORTUARIA MOVILIZADA Y MANIPULADA
+
+\begin{frame}{\textbf{Carga Portuaria Movilizada y Manipulada}}
+
+<<CARGA PORTUARIA MOVILIZADA Y MANIPULADA, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_CPMM = read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/movimientos-de-carga-portuarios/cuadros-estadisticos/series-mensuales/tabulados-2019-2022.xlsx?sfvrsn=50800d57_18",
+                                  sheet=1,          # En la hoja 1 del documento xlsx estan los datos que necesitamos
+                                  startRow = 3,      # en la fila 3 comienzan los datos
+                                  colNames= TRUE)   # Dejamos la fila 3 como nombre de las columnas.
+
+str(datos_originales_CPMM)
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_8 <- head(datos_originales_CPMM, n=-2)
+str(filtro_8)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_CPMM_1 <- mutate(filtro_8, mes_char=case_when(Mes== 1~ "Enero" , #Agrego una nueva variable mes_char para llamar en latex.
+                                            Mes== 2~"Febrero", 
+                                            Mes== 3~"Marzo",
+                                            Mes== 4~"Abril",
+                                            Mes== 5~"Mayo",
+                                            Mes== 6~"Junio",
+                                            Mes== 7~"Julio",
+                                            Mes== 8~"Agosto",
+                                            Mes== 9~"Septiembre",
+                                            Mes== 10~"Octubre",
+                                            Mes== 11~"Noviembre", 
+                                            Mes== 12~"Diciembre"))          
+str(mod_CPMM_1)
+
+mod_CPMM_2 <- mod_CPMM_1 %>% mutate(fecha =(paste(`Año`, `Mes`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_CPMM_2) 
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_CPMM_2$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_CPMM_2)[1]) {
+  mod_CPMM_2$var_mensual[i] <- (((mod_CPMM_2$Total[i]/mod_CPMM_2$Total[i-1])-1)*100)
+}
+
+mod_CPMM_2$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_CPMM_2)[1]) {
+  mod_CPMM_2$var_12meses[i] <- (((mod_CPMM_2$Total[i]/mod_CPMM_2$Total[i-12])-1)*100)
+}
+
+mod_CPMM_2$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_CPMM_2)[1]) {
+  mod_CPMM_2$var_acumulada [i]<-(sum(mod_CPMM_2$Total[(i-j):(i)])/sum(mod_CPMM_2$Total[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+# PARA EL GRAFICO DE BARRAS
+
+fecha <-as.Date(mod_CPMM_2$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_CPMM_2$Año)
+mes_num <-as.numeric(mod_CPMM_2$Mes)
+mes_char<-as.character(mod_CPMM_2$mes_char)
+total_carga<-as.numeric(mod_CPMM_2$Total/1000)
+var_mensual <-as.numeric(mod_CPMM_2$var_mensual)
+var_12meses <-as.numeric(mod_CPMM_2$var_12meses)
+var_acumulada <-as.numeric(mod_CPMM_2$var_acumulada)
+
+datos_filtrados_CPMM<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,total_carga=total_carga,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+# PARA EL GRAFICO CIRCULAR
+
+cabotaje <-as.numeric(mod_CPMM_2$Cabotaje)  # Asignamos formato Date a la fecha para graficar
+embarcada <-as.numeric(mod_CPMM_2$Embarcada.al.Exterior)
+desembarcada <-as.numeric(mod_CPMM_2$Desembarcada.del.Exterior)
+reestribasytransito<-as.numeric(c(mod_CPMM_2$`Re-Estibas.y.Transbordos`+mod_CPMM_2$Tránsito))
+
+datos_filtrados_CPMM_2<-data.frame(cabotaje=cabotaje,embarcada=embarcada,desembarcada=desembarcada,reestribasytransito=reestribasytransito)
+
+## f) FILTRAMOS ULTIMAS 30 PARA EL GRAFICO DE EVOLUCION
+
+# PARA EL GRAFICO DE BARRAS
+
+datos_grafica_CPMM <- tail(datos_filtrados_CPMM, n=30)
+str(datos_grafica_CPMM)
+#tail(datos_filtrados_DP, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+# PARA EL GRAFICO CIRCULAR 
+
+datos_grafica_CPMM_2 <- tail(datos_filtrados_CPMM_2, n=1)
+
+
+
+## g) GRAFICAMOS
+
+
+##GRAFICO DE BARRAS
+
+a<-40  #15
+b<-1960  #1000
+
+grafico_8a <- ggplot(datos_grafica_CPMM, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(total_carga-b)/a), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(total_carga-b)/a), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación Interanual (%)",breaks = seq(-25, 30, 5),position = "right",sec.axis = sec_axis(~.*a+b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Miles de Toneladas" ,breaks = seq(1000, 3000, 500) ))+
+  labs(title ="\U2588 Variación 12 Meses (%)" , subtitle= "-o- Carga Total Efectiva")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_8a + theme(plot.subtitle = element_text(size = 16, colour ="firebrick3" , hjust = 0.95),
+                   plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+ggsave("grafico_8a.png",width = 9.5, height = 6)
+
+## GRAFICO CIRCULAR 
+
+categorias <- c("Cabotaje","Desembarcada del Exterior", "Embarcada al Exterior","Tránsito, Re-estibas y Transbordos") 
+valores <- c(datos_grafica_CPMM_2$cabotaje,datos_grafica_CPMM_2$embarcada,datos_grafica_CPMM_2$desembarcada,datos_grafica_CPMM_2$reestribasytransito)
+
+df <- data.frame(valores, categorias)
+
+porcentaje<- df$valores/sum(df$valores)
+
+pcnt <- percent(porcentaje, accuracy=0.1 , decimal.mark = ",")
+
+df2 <- data.frame(valores, pcnt, categorias, porcentaje)
+
+
+grafico_8b <- ggplot(df2, aes(x = "", y = porcentaje, fill = categorias)) +
+  geom_col(color = "white") +
+  geom_label(aes(label = pcnt), color = "white" ,position = position_stack(vjust = c(0.5, 0.5,0.5,0.5)),size=4, show.legend = FALSE) +
+  labs(x=NULL)+
+  guides(fill = guide_legend(title = "Fuente de Producción"),size = guide_legend(order=3)) +
+  scale_fill_manual(values = c("firebrick4","royalblue4","#CDAD00","darkolivegreen3"))+
+  coord_polar(theta = "y")+
+  theme_void() 
+grafico_8b + theme()
+
+ggsave("grafico_8b.png",width = 5, height = 3) # guardamos el grafico para utilizarlo en latex
+
+
+@
+
+\scriptsize{\begin{itemize}
+
+\item Carga Portuaria Movilizada y Manipulada, \Sexpr{datos_grafica_CPMM$mes_char[30]} \Sexpr{datos_grafica_CPMM$año[30]}: \Sexpr{datos_grafica_CPMM$total_carga[30]}\ Toneladas  % MES Y AÑO AUTOMATICOS
+\item Variación Mensual : \Sexpr{datos_grafica_CPMM$var_mensual[30]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_CPMM$var_12meses[30]}\% }
+
+\end{itemize}	
+\vspace{0.4cm}
+
+
+\begin{columns}[c]
+
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{CARGA PORTUARIA MOVILIZADA Y MANIPULADA \\
+\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_CPMM$mes_char[1]} \Sexpr{datos_grafica_CPMM$año[1]} - \Sexpr{datos_grafica_CPMM$mes_char[30]} \Sexpr{datos_grafica_CPMM$año[30]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+\includegraphics[width=1\textwidth]{grafico_8a.png}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{PARTICIPACIÓN POR TIPO DE SERVICIO (\%) \\
+\textcolor{azul1}{Región del Biobío - \Sexpr{datos_grafica_CPMM$mes_char[30]} \Sexpr{datos_grafica_CPMM$año[30]} }}}}}
+\includegraphics[width=1\textwidth]{grafico_8b.png} % INTERVALO MES/AÑO AUTOMATICOS
+\end{column}
+
+\end{columns}
+
+
+\end{frame}
+
+
+
+% ITEM 9: PERNOCTACIONES EN ESTABLECIMIENTOS DE ALOJAMIENTO TURÍSTICO
+
+
+\begin{frame}{\textbf{Pernoctaciones en Establecimientos de Alojamiento Turístico}}
+
+<<PERNOCTACIONES EN ESTABLECIMIENTOS DE ALOJAMIENTO TURÍSTICO, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_PEAT= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/actividad-del-turismo/cuadros-estadisticos/series-mensuales/numero-de-llegadas-y-pernoctaciones-de-pasajeros-en-establecimientos-de-alojamiento-turistico.xlsx?sfvrsn=cb993818_29",
+                                 sheet=1,             # Solo hay 1 hoja en el documento xlsx              
+                                 startRow=7,          # En la fila 7 comienzan los datos
+                                 colNames =FALSE)     # No dejo ninguna columan como nombre   
+str(datos_originales_PEAT)
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_9 <- head(datos_originales_PEAT, n=-32)
+str(filtro_9)
+
+filtro_9_<-filtro_9%>% select (X1,X2,X3,X6)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_PEAT_1<-filtro_9_%>% mutate(año=(substr(filtro_9_$X1,1,4))) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_PEAT_1)
+
+mod_PEAT_2<-mod_PEAT_1%>% mutate(mes_char=(str_trim(filtro_9_$X2))) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_PEAT_1)
+                                                                                                             
+
+mod_PEAT_3 <- mutate(mod_PEAT_2, mes_num=case_when(mes_char=="Enero"~1 , #Agrego una nueva variable mes_char para llamar en latex.
+                                                                mes_char== "Febrero" ~2, 
+                                                                mes_char== "Marzo" ~3,
+                                                                mes_char== "Abril" ~4,
+                                                                mes_char== "Mayo" ~5,
+                                                                mes_char== "Junio" ~6,
+                                                                mes_char== "Julio" ~7,
+                                                                mes_char== "Agosto" ~8,
+                                                                mes_char== "Septiembre" ~9,
+                                                                mes_char== "Octubre" ~10,
+                                                                mes_char== "Noviembre" ~11, 
+                                                                mes_char== "Diciembre" ~12))     
+  
+  
+str(mod_PEAT_3)
+
+mod_PEAT_4 <- mod_PEAT_3 %>% mutate(fecha =(paste(`año`, `mes_num`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_PEAT_4) 
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_PEAT_4$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_PEAT_4)[1]) {
+  mod_PEAT_4$var_mensual[i] <- (((mod_PEAT_4$X6[i]/mod_PEAT_4$X6[i-1])-1)*100)
+}
+
+mod_PEAT_4$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_PEAT_4)[1]) {
+  mod_PEAT_4$var_12meses[i] <- (((mod_PEAT_4$X6[i]/mod_PEAT_4$X6[i-12])-1)*100)
+}
+
+mod_PEAT_4$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_PEAT_4)[1]) {
+  mod_PEAT_4$var_acumulada [i]<-(sum(mod_PEAT_4$X6[(i-j):(i)])/sum(mod_PEAT_4$X6[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+str(mod_PEAT_4)
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_PEAT_4$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_PEAT_4$año)
+mes_num <-as.numeric(mod_PEAT_4$mes_num)
+mes_char<-as.character(mod_PEAT_4$mes_char)
+total_pernoctaciones<-as.numeric(mod_PEAT_4$X6, options ("scipen"=1, "digits"=1, "big.mark"=".")) # SOLUCIONO LA IMPRESIÓN EM MODO CIENTIFICO EN LATEX
+var_mensual <-as.numeric(mod_PEAT_4$var_mensual)
+var_12meses <-as.numeric(mod_PEAT_4$var_12meses)
+var_acumulada <-as.numeric(mod_PEAT_4$var_acumulada)
+
+datos_filtrados_PEAT<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,total_pernoctaciones=total_pernoctaciones,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 29 FILAS IPC GENERAL PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_PEAT <- tail(datos_filtrados_PEAT, n=25)
+str(datos_grafica_PEAT)
+#tail(datos_filtrados_DP, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+
+## g) GRAFICAMOS 
+
+ylim.prim <-c(0,160000)   # total_pernoctaciones 
+ylim.sec <-c(-100,300)  # var_12meses
+
+
+b <- diff(ylim.prim)/diff(ylim.sec)
+a <- b*(ylim.prim[1] - ylim.sec[1])
+
+
+grafico_9 <- ggplot(datos_grafica_PEAT, aes(x=fecha))+
+  geom_bar(aes(y=total_pernoctaciones), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(a + var_12meses*b)), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(a + var_12meses*b)), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous( name = "N° de Pernoctaciones", breaks = seq(0,160000,20000) , position = "left",
+                     sec.axis = sec_axis(~(. - a)/b ,labels=function(x) format(x, big.mark = ".", scientific = FALSE),
+                     name = "Variación 12 meses (%)",breaks = seq(-100,300,50),))+
+  labs(title = "\U2588 Pernoctaciones" , subtitle= "-o- Variación 12 Mesesl (%)")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_9 + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                   plot.title = element_text(size = 16, colour = "royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+## h) GUARDAMOS EL GRAFICO PARA UTILIZARLO EN EL CODIGO DE LATEX
+
+ggsave("grafico_9.png",width = 9.5, height = 6)
+@
+
+
+\scriptsize{\begin{itemize}
+
+\item Pernoctaciones, \Sexpr{datos_grafica_PEAT$mes_char[25]} \Sexpr{datos_grafica_PEAT$año[25]}: \Sexpr{datos_grafica_PEAT$total_pernoctaciones[25]}\ Pernoctaciones  % MES Y AÑO AUTOMATICO
+\item Variación Mensual: \Sexpr{datos_grafica_PEAT$var_mensual[25]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_PEAT$var_12meses[25]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{\\PERNOCTACIONES EN ESTABLECIMIENTOS DE ALOJAMIENTO TURÍSTICO
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_PCBV$mes_char[1]} \Sexpr{datos_grafica_PCBV$año[1]} - \Sexpr{datos_grafica_PEAT$mes_char[25]} \Sexpr{datos_grafica_PEAT$año[25]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+
+\centering
+
+\includegraphics[width=8cm,height=4.5cm]{grafico_9.png}
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+% ITEM 10: ÍNDICE DE VENTAS EN SUPERMERCADOS A PRECIOS CONSTANTES
+
+\begin{frame}{\textbf{Índice de Ventas en Supermercados (ISUP) a Precios Constantes }}
+
+<<ÍNDICE DE VENTAS EN SUPERMERCADOS A PRECIOS CONSTANTES, echo=FALSE, include=FALSE>>=
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_VS = read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/ventas-de-supermercados/cuadros-estadisticos/series-mensuales/indice-de-ventas-de-supermercados.xlsx?sfvrsn=a608dc24_31",
+                                  sheet=1,             # Solo hay 1 hoja en el documento xlsx              
+                                  startRow=7,          # En la fila 7 comienzan los datos
+                                  colNames =FALSE)      # NO dejo la fila 6 como nombre de las columnas
+
+str(datos_originales_VS)
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_10 <- head(datos_originales_VS, n=-6)
+str(filtro_10)
+filtro_10_<-filtro_10%>% select (X1,X2,X7,X8,X9,X10)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_VS_1<-filtro_10_%>% mutate(año=(substr(filtro_10_$X1,1,4))) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_VS_1)
+
+mod_VS_2<-mod_VS_1%>% mutate(mes_char=(str_trim(filtro_10_$X2))) # Elimino los char(/P) de la variable año, dejando solo los primero 4 caracteres de X1. 
+str(mod_VS_2)
+
+mod_VS_3 <- mutate(mod_VS_2, mes_num=case_when(mes_char=="Enero"~1 , #Agrego una nueva variable mes_char para llamar en latex.
+                                                   mes_char== "Febrero" ~2, 
+                                                   mes_char== "Marzo" ~3,
+                                                   mes_char== "Abril" ~4,
+                                                   mes_char== "Mayo" ~5,
+                                                   mes_char== "Junio" ~6,
+                                                   mes_char== "Julio" ~7,
+                                                   mes_char== "Agosto" ~8,
+                                                   mes_char== "Septiembre" ~9,
+                                                   mes_char== "Octubre" ~10,
+                                                   mes_char== "Noviembre" ~11, 
+                                                   mes_char== "Diciembre" ~12))     
+
+
+str(mod_VS_3)
+
+mod_VS_4 <- mod_VS_3 %>% mutate(fecha =(paste(`año`, `mes_num`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_VS_4) 
+
+
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_VS_4$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_VS_4$año)
+mes_num <-as.numeric(mod_VS_4$mes_num)
+mes_char<-as.character(mod_VS_4$mes_char)
+indice_ventas<-as.numeric(mod_VS_4$X7)
+var_mensual <-as.numeric(mod_VS_4$X8)
+var_12meses <-as.numeric(mod_VS_4$X9)
+var_acumulada <-as.numeric(mod_VS_4$X10)
+
+datos_filtrados_VS<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,indice_ventas=indice_ventas,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 30 FILAS PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_VS <- tail(datos_filtrados_VS, n=30)
+str(datos_grafica_VS)
+#tail(datos_filtrados_DP, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+
+## g) GRAFICAMOS 
+
+a<-10
+b<-5
+
+grafico_10 <- ggplot(datos_grafica_VS, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(indice_ventas-b)/a), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(indice_ventas-b)/a), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación 12 meses (%)",breaks = seq(-10, 35, 5),position = "right",sec.axis = sec_axis(~.*a+b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Valores del Indice" ,breaks = seq(0, 350, 50) ))+
+  labs(title = "\U2588 Variación 12 meses (%)" , subtitle= "-o- ISUP a Precios Constantes")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_10 + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                   plot.title = element_text(size = 16, colour ="royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+
+## h) GUARDAMOS EL GRAFICO PARA UTILIZARLO EN EL CODIGO DE LATEX
+
+ggsave("grafico_10.png",width = 9.5, height = 6)
+
+@
+
+\scriptsize{\begin{itemize}
+
+\item ISUP a Precios Constantes, \Sexpr{datos_grafica_VS$mes_char[30]} \Sexpr{datos_grafica_VS$año[30]}: \Sexpr{datos_grafica_VS$indice_ventas[30]} % MES Y AÑO AUTOMATICO
+\item Variación Mensual: \Sexpr{datos_grafica_VS$var_mensual[30]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_VS$var_12meses[30]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{EVOLUCIÓN ISUP A PPRECIOS CONSTANTES (base promedio año 2014=100)
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_VS$mes_char[1]} \Sexpr{datos_grafica_VS$año[1]} - \Sexpr{datos_grafica_VS$mes_char[30]} \Sexpr{datos_grafica_VS$año[30]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+\centering
+\includegraphics[width=8cm,height=4.5cm]{grafico_10.png}
+
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+% ITEM 11: EXPORTACIONES REGIONALES
+
+\begin{frame}{\textbf{Exportaciones Regionales}}
+
+<<EXPORTACIONES REGIONALES, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL 
+
+datos_originales_EX= read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/exportaciones/cuadros-estadisticos/2022/tabulados-exportaciones-region-del-biobio-junio-2022.xlsx?sfvrsn=7087d608_4",
+                               sheet=6,             # En la hoja 6 del documento xlsx estan los datos que necesito.              
+                               startRow=4,          # En la fila 4 comienzan los datos
+                               colNames =FALSE,
+                               rowNames =TRUE)      # Dejp la fila 3 como nombre de las columnas
+str(datos_originales_EX)
+
+## b) aliminamos las filasque no contienen datos
+
+datos_originales_EX_ <-head(datos_originales_EX, n=-2) # elimino las ultimas dos filas que no contienen datos
+
+
+## c) Trasponemos filas por columnas
+
+filtro_11 <- transpose(datos_originales_EX_)
+
+# redefinismoa las filas y columnas
+
+rownames(filtro_11) <- colnames(datos_originales_EX_)
+colnames(filtro_11) <- rownames(datos_originales_EX_)
+
+
+filtro_11
+
+
+mod_EX_1 <- filtro_11 %>% mutate(año=(substr(filtro_11$GRUPO,5,8))) #  separo para tener una variable año
+str(mod_EX_1)
+        
+mod_EX_2 <- mod_EX_1 %>% mutate(mes=(substr(filtro_11$GRUPO,1,3)))  # separo para tener una variable año
+
+mod_EX_3 <- mutate(mod_EX_2,mes_num=case_when(mes=="ene"~1 , #Agrego una nueva variable mes_num 
+                                               mes== "feb" ~2, 
+                                               mes== "mar" ~3,
+                                               mes== "abr" ~4,
+                                               mes== "may" ~5,
+                                               mes== "jun" ~6,
+                                               mes== "jul" ~7,
+                                               mes== "ago" ~8,
+                                               mes== "sep" ~9,
+                                               mes== "oct" ~10,
+                                               mes== "nov" ~11, 
+                                               mes== "dic" ~12))     
+
+
+mod_EX_4 <- mutate(mod_EX_3,mes_char=case_when(mes=="ene"~ "Enero", #Agrego una nueva variable mes_num 
+                                              mes== "feb" ~"Febrero", 
+                                              mes== "mar" ~"Marzo",
+                                              mes== "abr" ~"Abril",
+                                              mes== "may" ~"Mayo",
+                                              mes== "jun" ~"Junio",
+                                              mes== "jul" ~"Julio",
+                                              mes== "ago" ~"Agosto",
+                                              mes== "sep" ~"Septiembre",
+                                              mes== "oct" ~"Octubre",
+                                              mes== "nov" ~"Noviembre", 
+                                              mes== "dic" ~"Diciembre"))     
+
+
+
+mod_EX_5 <- mod_EX_4 %>% mutate(fecha =(paste(`año`, `mes_num`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+ 
+mod_EX_6 <- mod_EX_5 %>% mutate(total_exportaciones=(as.numeric(mod_EX_5$`TOTAL EXPORTACIONES`))) # dejamos numerica la variable Total Exportaciones para calcular las variaciones
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS TRES NUEVAS VARIABLES
+
+
+mod_EX_6$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_EX_6)[1]) {
+  mod_EX_6$var_mensual[i] <- (((mod_EX_6$total_exportaciones[i]/mod_EX_6$total_exportaciones[i-1])-1)*100)
+}
+
+mod_EX_6$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_EX_6)[1]) {
+  mod_EX_6$var_12meses[i] <- (((mod_EX_6$total_exportaciones[i]/mod_EX_6$total_exportaciones[i-12])-1)*100)
+}
+
+mod_EX_6$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_EX_6)[1]) {
+  mod_EX_6$var_acumulada [i]<-(sum(mod_EX_6$total_exportaciones[(i-j):(i)])/sum(mod_EX_6$total_exportaciones[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+str(mod_EX_6)
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_EX_6$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_EX_6$año)
+mes_num <-as.numeric(mod_EX_6$mes_num)
+mes_char<-as.character(mod_EX_6$mes_char)
+total_exportaciones<-as.numeric(mod_EX_6$total_exportaciones/1000000) # PARA QUE QUEDE COMO EL GRAFICO DEL BOLETIN
+var_mensual <-as.numeric(mod_EX_6$var_mensual)
+var_12meses <-as.numeric(mod_EX_6$var_12meses)
+var_acumulada <-as.numeric(mod_EX_6$var_acumulada)
+
+datos_filtrados_EX<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,total_exportaciones=total_exportaciones,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 29 FILAS IPC GENERAL PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_EX <- tail(datos_filtrados_EX, n=13)
+#tail(datos_filtrados_EX, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+
+## g) GRAFICAMOS
+
+
+
+scaleFactor <- 95/1150  
+
+
+grafico_11 <- ggplot(datos_grafica_EX, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(total_exportaciones)*scaleFactor), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(total_exportaciones)*scaleFactor), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Variación 12 meses (%)",breaks = seq(-5,95,5),position = "right",sec.axis = sec_axis(~./scaleFactor, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Exportaciones (MMUS$FOB)" ,breaks = seq(-50,1150,50) ))+
+  labs(title = " -o- Exportaciones (MMUS$FOB) " , subtitle= "\U2588 Variación 12 Meses (%)")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_11 + theme(plot.subtitle = element_text(size = 16, colour ="royalblue4" , hjust = 0.95),
+                   plot.title = element_text(size = 16, colour ="firebrick3", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+ggsave("grafico_11.png",width=9.5, height=6) # guardamos el grafico para utilizarlo en latex
+
+
+@
+
+\scriptsize{\begin{itemize}
+  
+\item Exportaciones Regionales, \Sexpr{datos_grafica_EX$mes_char[13]} \Sexpr{datos_grafica_EX$año[13]}: \Sexpr{datos_grafica_EX$total_exportaciones[13]}\ MMUS\$  % MES Y AÑO AUTOMATICO
+\item Variación Mensual: \Sexpr{datos_grafica_EX$var_mensual[13]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_EX$var_12meses[13]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{EVOLUCIÓN EXPORTACIONES REGIONALES
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_EX$mes_char[1]} \Sexpr{datos_grafica_EX$año[1]} - \Sexpr{datos_grafica_EX$mes_char[13]} \Sexpr{datos_grafica_EX$año[13]}) }}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+
+\centering
+\includegraphics[width=8cm,height=4.5cm]{grafico_11.png}
+
+\vspace{0.3cm}
+
+\end{frame}
+
+
+
+% ITEM 12: ÍNDICE DE PRODUCCCIÓN MANUFACTURERA (IPMAN)
+
+\begin{frame}{\textbf{Índice de Producción Manufacturera (IPMAN)}}
+
+<<IPMAN, echo=FALSE, include=FALSE>>=
+
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_IPMAN = read.xlsx("https://regiones.ine.cl/documentos/default-source/region-viii/estadisticas/produccion-de-la-industria-manufacturera/cuadros-estadisticos/series-mensuales/anexo-ipman-base-2014.xlsx?sfvrsn=5a9b6226_4",
+                                   sheet=2,         # En la hoja 2 del documento xlsx estan los datos que necesito. 
+                                   startRow=8,
+                                   colNames=FALSE)
+str(datos_originales_IPMAN)
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_12 <- head(datos_originales_IPMAN, n=-5)
+str(filtro_12)
+
+filtro_12_<-filtro_12%>% select (X1,X2,X4,X5,X6,X7)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+mod_IPMAN_1 <- filtro_12_ %>% mutate(mes_char= ifelse(X2==1, "Enero", #Agrego una nueva variable mes_num para generar un as.date y graficar.
+                                               ifelse(X2==2,"Febrero", 
+                                               ifelse(X2==3,"Marzo", 
+                                               ifelse(X2==4,"Abril", 
+                                               ifelse(X2==5,"Mayo", 
+                                               ifelse(X2==6,"Junio", 
+                                               ifelse(X2==7,"Julio", 
+                                               ifelse(X2==8,"Agosto", 
+                                               ifelse(X2==9,"Septiembre",   
+                                               ifelse(X2==10,"Octubre", 
+                                               ifelse(X2==11,"Noviembre", "Diciembre"))))))))))))                  
+str(mod_IPMAN_1)
+
+mod_IPMAN_2 <- mod_IPMAN_1 %>% mutate(fecha =(paste(`X1`, `X2`,"01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_IPMAN_2) 
+
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_IPMAN_2$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_IPMAN_2$X1)
+mes_num <-as.numeric(mod_IPMAN_2$X2)
+mes_char<-as.character(mod_IPMAN_2$mes_char)
+indice_manufact<-as.numeric(mod_IPMAN_2$X4)
+var_mensual <-as.numeric(mod_IPMAN_2$X5)
+var_12meses <-as.numeric(mod_IPMAN_2$X6)
+var_acumulada <-as.numeric(mod_IPMAN_2$X7)
+
+datos_filtrados_IPMAN<-data.frame(fecha=fecha,año=año,mes_num=mes_num,mes_char=mes_char,indice_manufact=indice_manufact,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 25 FILAS PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_IPMAN <- tail(datos_filtrados_IPMAN, n=25)
+str(datos_grafica_IPMAN)
+#tail(datos_filtrados_DP, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+
+## g) GRAFICAMOS 
+
+a<-1
+b<-1
+
+grafico_12a <- ggplot(datos_grafica_IPMAN, aes(x=fecha))+
+  geom_bar(aes(y=var_12meses), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=(indice_manufact-b)/a), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=(indice_manufact-b)/a), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Valores del Indice",breaks = seq(0, 120, 20),position = "right",sec.axis = sec_axis(~.*a+b, labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Variación 12 meses (%)" ,breaks = seq(-20, 120, 20) ))+
+  labs(title = "\U2588 Variación 12 meses (%)" , subtitle= "-o- Indice de Producción Manufacturera")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_12a + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                    plot.title = element_text(size = 16, colour ="royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+
+
+## h) GUARDAMOS EL GRAFICO PARA UTILIZARLO EN EL CODIGO DE LATEX
+
+ggsave("grafico_12a.png",width = 9.5, height = 6)
+@
+
+
+\scriptsize{\begin{itemize}
+
+\item Índice de Producción Manufacturera, \Sexpr{datos_grafica_IPMAN$mes_char[25]} \Sexpr{datos_grafica_IPMAN$año[25]}: \Sexpr{datos_grafica_IPMAN$indice_manufact[25]} % MES Y AÑO AUTOMATICOS
+\item Variación Mensual: \Sexpr{datos_grafica_IPMAN$var_mensual[25]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_IPMAN$var_12meses[25]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{EVOLUCIÓN INDICE DE PRODUCCIÓN MANUFACTURERA (base promedio año 2014=100)
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_IPMAN$mes_char[1]} \Sexpr{datos_grafica_IPMAN$año[1]} - \Sexpr{datos_grafica_IPMAN$mes_char[25]} \Sexpr{datos_grafica_IPMAN$año[25]})}}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+\centering
+\includegraphics[width=8cm,height=4.5cm]{grafico_12.png}
+
+\vspace{0.3cm}
+\end{frame}
+
+
+
+
+
+
+
+
+% SECCIÓN 2: ESTADÍSTICAS SOCIALES
+
+\section{Estadísticas Sociales}
+
+
+
+
+
+
+% ITEM 13: TASA DE OCUPACIÓN INFORMAL
+
+\begin{frame}{\textbf{Tasa de Ocupación Informal}}
+
+<<TASA DE OCUPACIÓN INFORMAL, echo=FALSE, include=FALSE>>=
+
+## a) EXTRAEMOS LA BASE DE DATOS DE URL
+
+datos_originales_OI = read.xlsx("https://www.ine.cl/docs/default-source/informalidad-y-condiciones-laborales/cuadros-estadisticos/series-trimestrales/series-de-tiempo-nueva-calibraci%C3%B3n-proyecciones-de-poblaci%C3%B3n-censo-2017/informalidad_tasas.xlsx?sfvrsn=cbf364e1_91",
+                                sheet=13,          # Hoja 12 del documento xlsx correspondiente a la Región de Biobío
+                                startRow=8,        # Desde la fila 8 comienzan los datos
+                                colNames = FALSE)  # No dejamos ninguna fila como nombre de las variables porque no estan ordenadas.
+str(datos_originales_OI)
+
+## b) ELIMINAMOS LOS ULTIMOS DATOS.CHAR DE LA TABLA
+
+filtro_13 <- head(datos_originales_OI, n=-3)
+str(filtro_13)
+
+filtro_13_<-filtro_13%>% select (X1,X2,X3,X4,X9)
+
+
+## c) AGREGAMOS Y MODIFICAMOS VARIABLES
+
+
+
+
+mod_OI_1 <- mutate(filtro_13_, trim_num=case_when(X2== "Dic - Feb" ~1,
+                                                  X2=="Ene - Mar"~ 2 , #Agrego una nueva variable mes_char para llamar en latex.
+                                                  X2== "Feb - Abr" ~3, 
+                                                  X2== "Mar - May" ~4,
+                                                  X2== "Abr - Jun" ~5,
+                                                  X2== "May -Jul" ~6,
+                                                  X2== "Jun - Ago" ~7,
+                                                  X2== "Jul - Sep" ~8,
+                                                  X2== "Ago - Oct" ~9,
+                                                  X2== "Sep - Nov" ~10,
+                                                  X2== "Oct - Dic" ~11,
+                                                  X2== "Nov - Ene" ~12, 
+                                                  ))     
+
+
+
+
+mod_OI_2 <- mod_OI_1 %>% mutate(fecha =(paste(`X1`,`trim_num`, "01",  sep="-" )))  # Agrego uan variable fecha, uniendo mes_num y año_num y la dejo en formato as.date
+str(mod_OI_2) 
+
+
+## d) CALCULAMOS LA VARIACIÓN MENSUAL, DE 12 MESES Y ACUMULADA, Y CREAMOS DOS NUEVAS VARIABLES
+
+
+mod_OI_2$var_mensual <- NA                     # Agregamos variable variación mensual
+for(i in 2:dim(mod_OI_2)[1]) {
+  mod_OI_2$var_mensual[i] <- (((mod_OI_2$X4[i]/mod_OI_2$X4[i-1])-1)*100)
+}
+
+mod_OI_2$var_12meses <- NA                     # Agregamos variable variación 12 meses 
+for(i in 13:dim(mod_OI_2)[1]) {
+  mod_OI_2$var_12meses[i] <- (((mod_OI_2$X4[i]/mod_OI_2$X4[i-12])-1)*100)
+}
+
+mod_OI_2$var_acumulada <- NA                    # Agregamos variable variación acumulada
+z=13
+j=0
+for (i in 13: dim(mod_OI_2)[1]) {
+  mod_OI_2$var_acumulada [i]<-(sum(mod_OI_2$X4[(i-j):(i)])/sum(mod_OI_2$X4[(i-12-j):(i-12)])-1)*100
+  j<- ifelse(j==11 ,0,j+1)
+}
+
+str(mod_OI_2)
+
+
+## e) CREAMOS UN NUEVO DATA.FRAME PARA ALMACENER SOLO LAS VARIABLES QUE NECESITAMOS Y ASIGNAMOS NOMBRES
+
+fecha <-as.Date(mod_OI_2$fecha)  # Asignamos formato Date a la fecha para graficar
+año <-as.numeric(mod_OI_2$X1)
+trim_num <-as.numeric(mod_OI_2$trim_num)
+trim_char<-as.character(mod_OI_2$X2)
+tasa_oc_inf<-as.numeric(mod_OI_2$X9)
+
+
+
+var_mensual <-as.numeric(mod_OI_2$var_mensual)
+var_12meses <-as.numeric(mod_OI_2$var_12meses)
+var_acumulada <-as.numeric(mod_OI_2$var_acumulada)
+
+datos_filtrados_OI<-data.frame(fecha=fecha,año=año,trim_num=trim_num,trim_char=trim_char,tasa_oc_inf=tasa_oc_inf,var_mensual=var_mensual,var_12meses=var_12meses,var_acumulada=var_acumulada)
+
+
+## f) FILTRAMOS ULTIMAS 29 FILAS IPC GENERAL PARA EL GRAFICO DE EVOLUCION
+
+datos_grafica_OI <- tail(datos_filtrados_OI, n=25)
+str(datos_grafica_OI)
+#tail(datos_filtrados_DP, n=1)  # PARA VER DATOS DP MES ACTUAL
+
+
+## g) GRAFICAMOS 
+
+
+grafico_13 <- ggplot(datos_grafica_OI, aes(x=fecha))+
+  geom_bar(aes(y=tasa_oc_inf), stat="identity", fill="royalblue4")+
+  geom_line(aes(y=var_12meses), group=1, color="firebrick3", size=2) +
+  geom_point(aes(y=var_12meses), size=2,pch=21, colour="firebrick3", bg="white")+
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y", expand = c(0,8)) +
+  scale_y_continuous(name = "Tasa de Ocupación Informal (&)",breaks = seq(-40, 40, 10),position = "right",sec.axis = sec_axis(~., labels=function(x) format(x, big.mark = ".", scientific = FALSE), name = "Variación 12 meses (%)" ,breaks = seq(-40, 40, 10) ))+
+  labs(title = "\U2588 Tasa de Ocupación Informal (%)" , subtitle= "-o- Variación 12 meses (%)")+
+  theme_economist_white()+ theme(axis.text = element_text(size = 14), axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size = 16), axis.title.y.left = element_text(vjust=2, size = 15), axis.title.y.right = element_text(vjust=-2, size = 15))
+
+grafico_13 + theme(plot.subtitle = element_text(size = 16, colour = "firebrick3", hjust = 0.95),
+                    plot.title = element_text(size = 16, colour ="royalblue4", hjust = 0.05, vjust=-4 )) +labs(x = NULL)
+
+ggsave("grafico_13.png",width = 9.5, height = 6)
+
+@
+
+\scriptsize{\begin{itemize}
+
+\item Tasa de Ocupación Informal, \Sexpr{datos_grafica_OI$trim_char[25]} \Sexpr{datos_grafica_OI$año[25]}: \Sexpr{datos_grafica_OI$tasa_oc_inf[25]} %MES Y AÑO AUTOMATICO
+\item Variación Mensual: \Sexpr{datos_grafica_OI$var_mensual[25]}\% 
+\item Variación 12 Meses: \Sexpr{datos_grafica_OI$var_12meses[25]}\% }
+
+\end{itemize}	
+\vspace{0.3cm}
+
+\centering
+\caption{\textbf{\tiny{\textcolor{rojo1}{EVOLUCIÓN ITASA DE OCUPACIÓN INFORMAL
+\\\textcolor{azul1}{Región del Biobío (\Sexpr{datos_grafica_OI$trim_char[1]} \Sexpr{datos_grafica_OI$año[1]} - \Sexpr{datos_grafica_OI$trim_char[25]} \Sexpr{datos_grafica_OI$año[25]})}}}}} % INTERVALO MES/AÑO AUTOMATICOS
+
+\centering
+\includegraphics[width=8cm,height=4.5cm]{grafico_13.png}
+
+\vspace{0.3cm}
+\end{frame}
+
+
+
+% TABLA DATOS CONSTANTES
+
+
+\section{CENSO 2017}
+\begin{frame}{\textbf{Datos Censo 2017}}
+
+\centering
+\caption{\textbf{\small{\textcolor{rojo1}{\\TOTAL POBLACIÓN POR PROVINCIA, SEXO Y EDAD
+\\\textcolor{azul1}{Región del Biobío}}}}}
+
+\vspace{0.9cm}
+
+\setlength{\arrayrulewidth}{0.3mm}
+\setlength{\tabcolsep}{7pt}
+\renewcommand{\arraystretch}{1.5}
+{\centering{\tiny
+\begin{tabular}{||m{1.4cm}|m{2.4cm}|m{1.9cm}|m{1.9cm}||}
+\hline
+\textbf{PROVINCIA} & \textbf{POBLACIÓN CENSADA} & \textbf{TOTAL HOMBRES} & \textbf{TOTAL MUJERES}\\ \hline
+Concepción & 995,658 & 476,816 & 518,842 \\
+Arauco & 166,087 & 81,211 & 84,876 \\
+Biobío & 395,060 & 192,703 & 202,357 \\ \hline
+\end{tabular}}}
+
+\vspace{0.3cm}
+\setlength{\arrayrulewidth}{0.3mm}
+\setlength{\tabcolsep}{7pt}
+\renewcommand{\arraystretch}{1.5}
+\tiny{
+\begin{tabular}{||m{2cm}|m{2cm}|m{2cm}||}
+\hline
+\textcolor{azul1}{\textbf {TOTAL REGIONAL}} & \textcolor{azul1}{\textbf{TOTAL HOMBRES}} & \textcolor{azul1}{\textbf{TOTAL MUJERES}}  \\ 
+1,556,805  & 750,730 & 806,075   \\\hline
+\end{tabular}}
+
+\end{frame} 
+
+\end{document}
